@@ -12,6 +12,8 @@ class Network(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(2, 16),
             nn.ReLU(),
+            nn.Linear(16, 16),
+            nn.ReLU(),
             nn.Linear(16, 3)
         )
 
@@ -25,14 +27,14 @@ class DQN:
         self.targetNet = Network()
         self.learningRate = 0.001
         self.gamma = 0.9
-        self.batchSize = 128
+        self.batchSize = 64
         self.opt = optim.Adam(params=self.predictNet.parameters(), lr=self.learningRate)
         self.lossFunction = nn.MSELoss()
         self.replaySize = 2000
         self.replayMemory = np.zeros((self.replaySize, 6))  # size X (p, v, r, a, _p, _v)
         self.replayIndex = 0  # 经验回放池索引
         self.trainCount = 0  # 训练次数
-        self.updateRate = 100  # 更新targetNet频率
+        self.updateRate = 10  # 更新targetNet频率
 
     def store(self, p, v, r, a, _p, _v):
         self.replayMemory[self.replayIndex % self.replaySize] = [p, v, r, a, _p, _v]
@@ -56,10 +58,10 @@ class DQN:
         predictQ = predict[torch.arange(0, self.batchSize), aSamples.long()]
         targetQ = rSamples + self.gamma * torch.max(target, 1)[0]
         loss = self.lossFunction(predictQ, targetQ)
+        self.opt.zero_grad()
         loss.backward()
         self.opt.step()
-        self.opt.zero_grad()
-        # print("\nTrain:", self.trainCount, "loss:%.10f" % loss.item())
+        # print("loss:%.10f" % loss.item())
 
     def getAction(self, s):
         input = torch.from_numpy(s)
@@ -67,10 +69,9 @@ class DQN:
 
 
 dqn = DQN()
-
+"""  训练  """
 step = 0  # 单次回合数
 stopTraining = 0
-"""  训练  """
 episode = 0
 env = gym.make("MountainCar-v0")
 while True:
@@ -86,7 +87,7 @@ while True:
     step = 0
     # 限制回合数
     while True:
-        epsilon = max(0.9 - 0.8 * episode / 100, 0.1)
+        epsilon = max(0.9 - 0.8 * dqn.trainCount / 1000000, 0.1)
         # print(epsilon)
         if random.random() < epsilon:
             action = env.action_space.sample()
@@ -104,7 +105,7 @@ while True:
         # print("Step:%d Position:%f Velocity:%f Reward:%f Done:%d" % (step, observation[0], observation[1], reward,
         # done))
         if done:
-            reward = 2
+            reward = 5
             dqn.store(s[0], s[1], reward, action, _s[0], _s[1])
             break
         step += 1
