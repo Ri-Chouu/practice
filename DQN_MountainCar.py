@@ -54,9 +54,13 @@ class DQN:
         aSamples = Samples[:, 3]
         _sSamples = Samples[:, -2:]
         predict = self.predictNet(sSamples)
-        target = self.targetNet(_sSamples).detach()
+        # target = self.targetNet(_sSamples).detach() # DQN
+        target = self.predictNet(_sSamples).detach()  # DDQN 预测网络_s的最大值
+        targetQIndex = torch.max(self.predictNet(_sSamples).detach(), 1)[1]  # DDQN 预测网络_s最大值的索引
         predictQ = predict[torch.arange(0, self.batchSize), aSamples.long()]
-        targetQ = rSamples + self.gamma * torch.max(target, 1)[0]
+        # targetQ = rSamples + self.gamma * torch.max(target, 1)[0] # DQN
+        targetQ = rSamples + self.gamma * self.targetNet(_sSamples)[
+            torch.arange(0, self.batchSize), targetQIndex.long()]  # DDQN 预测网络_s的最大值的索引对应的目标网络Q值用来训练
         loss = self.lossFunction(predictQ, targetQ)
         self.opt.zero_grad()
         loss.backward()
